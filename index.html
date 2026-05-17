@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qualitative Research Methodology Exam — M.Pharm Administration</title>
+<style>
+  :root{
+    --navy:#0D2D6B; --teal:#0A7E8C; --yellow:#FFD166; --green:#06D6A0;
+    --coral:#FF6B6B; --lavender:#845EC2; --orange:#FF9A3C; --bg:#F2F5FF;
+    --card:#FFFFFF; --border:#D0DAF0; --ink:#1B2333; --muted:#5A6B8C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Nunito','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;}
+  .hidden{display:none !important;}
+
+  /* ---------- Gate / Login ---------- */
+  .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .gate-card{background:var(--card);border:1px solid var(--border);border-radius:18px;
+    max-width:520px;width:100%;padding:36px 34px;box-shadow:0 10px 34px rgba(13,45,107,.14);}
+  .gate-card h1{color:var(--navy);font-size:1.45rem;margin-bottom:6px;}
+  .gate-card .sub{color:var(--muted);font-size:.95rem;margin-bottom:22px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-weight:700;font-size:.9rem;margin-bottom:6px;color:var(--navy);}
+  .field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;
+    font-size:1rem;font-family:inherit;background:#FBFCFF;}
+  .field input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(10,126,140,.15);}
+  .btn{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:13px 22px;
+    font-size:1rem;font-weight:800;font-family:inherit;cursor:pointer;width:100%;transition:.15s;}
+  .btn:hover{background:#0a2456;}
+  .btn.teal{background:var(--teal);} .btn.teal:hover{background:#086873;}
+  .err{color:var(--coral);font-weight:700;font-size:.88rem;margin-top:10px;min-height:18px;}
+  .notice{background:#FFF6DC;border:1px solid var(--yellow);border-radius:10px;
+    padding:12px 14px;font-size:.85rem;color:#7A5A00;margin-bottom:20px;}
+  .notice b{color:#5A4200;}
+
+  /* ---------- Header / Timer ---------- */
+  header{background:var(--navy);color:#fff;padding:14px 22px;position:sticky;top:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    box-shadow:0 3px 12px rgba(0,0,0,.18);}
+  header .accent{height:4px;background:var(--teal);}
+  .h-title{font-size:1.02rem;font-weight:800;}
+  .h-title small{display:block;font-weight:600;font-size:.74rem;color:#AEC1E8;}
+  .timer{display:flex;align-items:center;gap:14px;}
+  .clock{background:#fff;color:var(--navy);font-weight:900;font-size:1.25rem;
+    padding:6px 16px;border-radius:10px;font-variant-numeric:tabular-nums;letter-spacing:1px;}
+  .clock.warn{background:var(--orange);color:#fff;animation:pulse 1s infinite;}
+  .clock.danger{background:var(--coral);color:#fff;animation:pulse .6s infinite;}
+  @keyframes pulse{50%{opacity:.55;}}
+  .progress-pill{font-size:.8rem;color:#AEC1E8;font-weight:700;}
+
+  /* ---------- Layout ---------- */
+  .wrap{max-width:900px;margin:0 auto;padding:26px 20px 120px;}
+  .examhead{background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;margin-bottom:22px;border-left:6px solid var(--teal);}
+  .examhead h2{color:var(--navy);font-size:1.15rem;margin-bottom:6px;}
+  .examhead p{font-size:.9rem;color:var(--muted);}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .chip{background:var(--bg);border:1px solid var(--border);border-radius:20px;
+    padding:4px 12px;font-size:.78rem;font-weight:700;color:var(--navy);}
+
+  .section-band{background:linear-gradient(90deg,var(--navy),var(--teal));color:#fff;
+    border-radius:12px;padding:14px 18px;margin:26px 0 14px;}
+  .section-band h3{font-size:1.02rem;}
+  .section-band span{font-size:.82rem;color:#DCE6FF;font-weight:600;}
+
+  .q{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;margin-bottom:14px;box-shadow:0 4px 10px rgba(13,45,107,.06);
+    border-left:5px solid var(--navy);}
+  .q .qnum{display:inline-block;background:var(--navy);color:#fff;font-weight:800;
+    font-size:.78rem;padding:3px 10px;border-radius:6px;margin-bottom:8px;}
+  .q .stem{font-weight:700;font-size:.99rem;margin-bottom:12px;color:var(--ink);}
+  .opt{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:8px;
+    border:1.4px solid var(--border);margin-bottom:7px;cursor:pointer;transition:.12s;background:#FBFCFF;}
+  .opt:hover{border-color:var(--teal);background:#F3FAFB;}
+  .opt input{margin-top:4px;accent-color:var(--teal);transform:scale(1.15);}
+  .opt .lbl{font-weight:800;color:var(--teal);min-width:20px;}
+  .opt.sel{border-color:var(--teal);background:#E7F6F8;}
+  .opt span.txt{font-size:.93rem;}
+
+  /* dropdown questions */
+  .dd-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;
+    border:1.2px solid var(--border);border-radius:8px;margin-bottom:8px;background:#FBFCFF;}
+  .dd-row .stm{flex:1;min-width:240px;font-size:.92rem;font-weight:600;}
+  .dd-row select{padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;
+    font-family:inherit;font-size:.88rem;font-weight:700;background:#fff;color:var(--navy);min-width:210px;}
+  .dd-row select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(10,126,140,.15);}
+  .dd-row select.done{background:#E7F6F8;border-color:var(--teal);}
+
+  /* ---------- Footer submit bar ---------- */
+  .submitbar{position:fixed;bottom:0;left:0;right:0;background:var(--navy);
+    padding:12px 20px;display:flex;align-items:center;justify-content:space-between;
+    gap:14px;box-shadow:0 -3px 14px rgba(0,0,0,.22);z-index:50;flex-wrap:wrap;}
+  .submitbar .stat{color:#AEC1E8;font-size:.84rem;font-weight:700;}
+  .submitbar .stat b{color:#fff;}
+  .submitbar button{width:auto;padding:11px 26px;}
+
+  /* ---------- Overlays ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(13,45,107,.93);z-index:200;
+    display:flex;align-items:center;justify-content:center;padding:24px;}
+  .overlay-card{background:#fff;border-radius:18px;max-width:560px;width:100%;
+    padding:34px 32px;text-align:center;}
+  .overlay-card h2{color:var(--navy);margin-bottom:10px;}
+  .overlay-card p{color:var(--muted);font-size:.95rem;margin-bottom:18px;}
+  .scorebox{font-size:2.6rem;font-weight:900;color:var(--teal);margin:8px 0;}
+  .lockicon{font-size:2.6rem;margin-bottom:8px;}
+
+  .footer-credit{text-align:center;color:var(--muted);font-size:.78rem;
+    padding:20px;border-top:1px solid var(--border);margin-top:30px;}
+  @media print{.submitbar,header,.btn{display:none;}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN GATE ============ -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <h1>Informatics &amp; Research Methods</h1>
+    <p class="sub">Qualitative Research Methodology — M.Pharm (Pharmacy Administration)</p>
+
+    <div class="notice">
+      <b>Before you begin — please read:</b><br>
+      • This is an <b>open-book</b> exam. You may consult the two assigned Melhem &amp; Melhem articles.<br>
+      • Once opened, you have <b>exactly 60 minutes</b>. The exam submits and locks automatically when time ends.<br>
+      • <b>One attempt only.</b> The exam will not reopen on this device after submission.<br>
+      • Valid only <b>18 May 2026 – 20 May 2026</b>. No internet connection is required.<br>
+      • Do not refresh the page during the exam — your timer keeps running.
+    </div>
+
+    <div class="field">
+      <label for="sname">Full Name</label>
+      <input type="text" id="sname" placeholder="Enter your full name" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="sid">University Student ID</label>
+      <input type="text" id="sid" placeholder="Enter your student ID" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="spass">Access Password</label>
+      <input type="password" id="spass" placeholder="Enter exam password" autocomplete="off">
+    </div>
+    <button class="btn" id="startBtn">Start Exam — Begin 60-Minute Timer</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<!-- ============ EXAM ============ -->
+<div id="exam" class="hidden">
+  <header>
+    <div class="h-title">Qualitative Research Methodology Exam
+      <small>M.Pharm Administration · University of Jordan</small></div>
+    <div class="timer">
+      <span class="progress-pill" id="progPill">0 / 20 answered</span>
+      <div class="clock" id="clock">60:00</div>
+    </div>
+  </header>
+  <div class="accent"></div>
+
+  <div class="wrap">
+    <div class="examhead">
+      <h2>Open-Book Examination</h2>
+      <p>This paper has <b>two parts</b> and <b>20 questions</b>. Part A: 10 multiple-choice questions
+      (one best answer, A–E). Part B: 10 drop-down items assessing methodological reporting
+      against the COREQ framework (Tong, Sainsbury &amp; Craig, 2007).</p>
+      <div class="meta-row">
+        <span class="chip" id="chipName">Candidate: —</span>
+        <span class="chip" id="chipId">ID: —</span>
+        <span class="chip">Duration: 60 minutes</span>
+        <span class="chip">Total: 20 marks</span>
+      </div>
+    </div>
+
+    <!-- ===== PART A ===== -->
+    <div class="section-band">
+      <h3>Part A — Multiple Choice Questions (10 marks)</h3>
+      <span>Select the single BEST answer. Each question carries 1 mark.</span>
+    </div>
+    <div id="mcqContainer"></div>
+
+    <!-- ===== PART B ===== -->
+    <div class="section-band">
+      <h3>Part B — COREQ Methodology Appraisal (10 marks)</h3>
+      <span>For each statement, choose the option that correctly classifies the methodological
+      element. Based on Tong et al. (2007), COREQ 32-item checklist.</span>
+    </div>
+    <div id="ddContainer"></div>
+
+    <div class="footer-credit">
+      Dr. Samar Melhem · Informatics &amp; Research Methods · M.Pharm Pharmacy Administration ·
+      University of Jordan · sa.melhem@ju.edu.jo · Office 225
+    </div>
+  </div>
+
+  <div class="submitbar">
+    <div class="stat">Answered: <b id="answeredCount">0</b> / 20 &nbsp;·&nbsp;
+      Time left: <b id="barTime">60:00</b></div>
+    <button class="btn teal" id="submitBtn">Submit Exam</button>
+  </div>
+</div>
+
+<!-- ============ RESULT OVERLAY ============ -->
+<div id="resultOverlay" class="overlay hidden">
+  <div class="overlay-card">
+    <div class="lockicon">&#128274;</div>
+    <h2 id="resTitle">Exam Submitted</h2>
+    <p id="resMsg">Your responses have been recorded. This exam is now locked.</p>
+    <div class="scorebox" id="scoreBox">—</div>
+    <p id="resDetail" style="font-size:.85rem;"></p>
+    <button class="btn" id="downloadBtn">Download My Submission Receipt</button>
+  </div>
+</div>
+
+<!-- ============ ALREADY-DONE / EXPIRED OVERLAY ============ -->
+<div id="blockOverlay" class="overlay hidden">
+  <div class="overlay-card">
+    <div class="lockicon" id="blockIcon">&#128683;</div>
+    <h2 id="blockTitle">Access Closed</h2>
+    <p id="blockMsg"></p>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURATION
+   ============================================================ */
+const CONFIG = {
+  password   : "MelhemQ2024",
+  durationMin: 60,
+  openFrom   : new Date(2026,4,18,0,0,0),   // 18 May 2026 00:00 (month is 0-indexed)
+  openUntil  : new Date(2026,4,20,23,59,59),// 20 May 2026 23:59
+  storageKey : "qualResearchExam_MPharm_2026"
+};
+
+/* ============================================================
+   QUESTION BANK  — Part A: 10 difficult MCQs (A–E)
+   Grounded in:
+   [1] Melhem SJ, Nabhani-Gebara S, Kayyali R. Leveraging e-health for enhanced
+       cancer-care service models in middle-income contexts. Digital Health 2024;10.
+   [2] Melhem SJ, Nabhani-Gebara S, Bulatova N, et al. Scaling holistic e-health
+       solutions in cancer care using a qualitative realist framework.
+       Front Public Health 2025;13:1617857.
+   ============================================================ */
+const MCQ = [
+ {
+  n:1,
+  stem:"In the 2025 realist study, the analytic strategy combined line-by-line inductive coding with mapping to Grol & Wensing's Implementation of Change Model. This integration of data-driven and theory-driven coding is most precisely described as a:",
+  opts:[
+   "Pure grounded-theory design with theoretical sampling",
+   "Hybrid inductive–deductive Framework Method analysis",
+   "Interpretative phenomenological analysis (IPA)",
+   "Deductive content analysis using a fixed a-priori codebook only",
+   "Constant-comparative discourse analysis"],
+  ans:"B"
+ },
+ {
+  n:2,
+  stem:"Both Melhem & Melhem studies recruited participants in two sequential phases — first identifying information-rich oncology professionals, then asking enrolled participants to refer peers. The phase-two technique and its PRIMARY methodological justification are, respectively:",
+  opts:[
+   "Convenience sampling — to reduce cost",
+   "Quota sampling — to match population proportions",
+   "Snowball sampling — to reach dispersed, less-visible clinicians and reduce gatekeeping",
+   "Theoretical sampling — to test an emerging hypothesis",
+   "Maximum-variation sampling — to guarantee statistical representativeness"],
+  ans:"C"
+ },
+ {
+  n:3,
+  stem:"The realist study states that data saturation was confirmed by conducting three ADDITIONAL interviews that were then EXCLUDED from the final analysis. The methodological function of these three interviews was to:",
+  opts:[
+   "Increase the effective sample size for greater power",
+   "Serve as a pilot to refine the interview guide",
+   "Provide member-checking of the final themes",
+   "Verify that no new codes emerged, thereby confirming saturation",
+   "Allow triangulation across a second data source"],
+  ans:"D"
+ },
+ {
+  n:4,
+  stem:"In the realist study the interviewer (SJM) is described as having had no prior acquaintance with participants. Within COREQ Domain 1 (research team and reflexivity), the MOST defensible reason for reporting this detail is that it:",
+  opts:[
+   "Demonstrates the sample was randomly selected",
+   "Establishes inter-rater reliability of the coding",
+   "Addresses the interviewer–participant relationship and potential response/selection bias",
+   "Confirms that thematic saturation was achieved",
+   "Satisfies the requirement for an audit trail of transcripts"],
+  ans:"C"
+ },
+ {
+  n:5,
+  stem:"Interviews in the realist study were conducted in Jordanian Arabic, transcribed verbatim, translated into English, and a SUBSET of translations was independently checked by two bilingual co-authors. The independent translation check chiefly strengthens which aspect of trustworthiness?",
+  opts:[
+   "Transferability of findings to other countries",
+   "Statistical generalisability of the sample",
+   "Confirmability/credibility by guarding against translation-induced distortion",
+   "Internal validity through randomisation",
+   "Construct validity of a measurement scale"],
+  ans:"C"
+ },
+ {
+  n:6,
+  stem:"A reviewer argues the realist study's findings have limited TRANSFERABILITY. Which design feature, as reported by the authors, is the STRONGEST legitimate basis for that critique?",
+  opts:[
+   "Use of NVivo 12 for data management",
+   "The predominance of urban-based clinicians managing mainly breast and colorectal cancers",
+   "Use of semi-structured rather than structured interviews",
+   "Verbatim transcription of all recordings",
+   "The 32-item COREQ checklist being completed"],
+  ans:"B"
+ },
+ {
+  n:7,
+  stem:"The 2024 e-health study used Braun & Clarke's INDUCTIVE thematic analysis, whereas the 2025 study used a hybrid Framework Method anchored to an a-priori implementation model. The single most consequential epistemological difference between the two approaches is that the 2025 study:",
+  opts:[
+   "Allowed pre-existing theoretical constructs to structure the higher-order coding",
+   "Used a larger sample and therefore reached saturation faster",
+   "Abandoned coding in favour of narrative summary",
+   "Replaced qualitative interviews with a structured survey",
+   "Did not require an interview topic guide"],
+  ans:"A"
+ },
+ {
+  n:8,
+  stem:"The realist study explicitly frames its inquiry as determining 'what works, for whom, and under which circumstances.' This phrasing signals which underpinning research paradigm?",
+  opts:[
+   "Radical constructivism",
+   "Positivism with hypothetico-deductive testing",
+   "Critical/scientific realism (realist evaluation)",
+   "Post-structural discourse theory",
+   "Pragmatic mixed-methods triangulation"],
+  ans:"C"
+ },
+ {
+  n:9,
+  stem:"In reporting illustrative quotations, the authors attach identifiers such as 'HCP10, senior fellow oncologist, KHCC, semi-governmental, male, 40 years'. Within COREQ Domain 3 (analysis and findings), the PRINCIPAL purpose of this practice is to:",
+  opts:[
+   "Protect participant anonymity by removing all context",
+   "Demonstrate the consistency of coding across the team",
+   "Provide contextualised evidence so readers can judge whether data support the interpretation",
+   "Indicate the chronological order of the interviews",
+   "Show that the sample size was statistically adequate"],
+  ans:"C"
+ },
+ {
+  n:10,
+  stem:"The realist study reports that the coding framework, after the principal investigator's initial coding, was reviewed and refined by two further authors, and the final overarching theme was 'derived by team consensus'. The MOST accurate methodological label for this team-based procedure is:",
+  opts:[
+   "Inter-rater reliability quantified by a kappa coefficient",
+   "Investigator triangulation to enhance analytic credibility",
+   "Respondent validation (member checking)",
+   "Methodological triangulation across data types",
+   "Peer debriefing by an external auditor"],
+  ans:"B"
+ }
+];
+
+/* ============================================================
+   Part B: 10 drop-down items — COREQ methodology appraisal
+   Each item: a statement + 5 options; one correct.
+   ============================================================ */
+const DD = [
+ {
+  n:11,
+  stm:"The statement \"the interviewer was a female PhD researcher with training in qualitative methods\" belongs to which COREQ domain?",
+  opts:["Domain 1 — Research team & reflexivity","Domain 2 — Study design","Domain 3 — Analysis & findings","Not a COREQ item","Domain 2 — Data collection setting"],
+  ans:"Domain 1 — Research team & reflexivity"
+ },
+ {
+  n:12,
+  stm:"Reporting that interviews continued \"until no new codes emerged\" addresses which specific COREQ checklist concern?",
+  opts:["Data saturation","Member checking","Non-participation / refusal","Audio recording","Interviewer reflexivity"],
+  ans:"Data saturation"
+ },
+ {
+  n:13,
+  stm:"Stating that the interview topic guide was \"piloted and refined after review by methodological advisors\" is the COREQ item known as:",
+  opts:["Pilot testing of the interview guide","Theoretical framework","Coding tree","Saturation","Participant feedback on findings"],
+  ans:"Pilot testing of the interview guide"
+ },
+ {
+  n:14,
+  stm:"\"One eligible oncologist declined to participate\" — reporting this corresponds to which COREQ item?",
+  opts:["Non-participation (number and reasons)","Sample size","Data saturation","Repeat interviews","Field notes"],
+  ans:"Non-participation (number and reasons)"
+ },
+ {
+  n:15,
+  stm:"Specifying that interviews were held \"face-to-face or via secure videoconference according to participant preference\" maps to the COREQ item:",
+  opts:["Setting / presence of non-participants & mode of interview","Sampling strategy","Description of the coding tree","Themes derived in advance or from data","Software used"],
+  ans:"Setting / presence of non-participants & mode of interview"
+ },
+ {
+  n:16,
+  stm:"\"NVivo 12 was used to manage and organise the coded data\" — this is the COREQ item:",
+  opts:["Software","Number of coders","Major and minor themes","Quotations presented","Transcripts returned to participants"],
+  ans:"Software"
+ },
+ {
+  n:17,
+  stm:"A statement that \"two authors independently reviewed and refined the coding framework\" satisfies which COREQ item?",
+  opts:["Number of data coders / derivation of themes","Audio recording","Duration of interviews","Participant recruitment method","Interviewer credentials"],
+  ans:"Number of data coders / derivation of themes"
+ },
+ {
+  n:18,
+  stm:"Reporting that \"mean interview duration was 80 minutes (range 53–127)\" corresponds to which COREQ item?",
+  opts:["Duration of interviews","Saturation","Field notes","Member checking","Theoretical framework"],
+  ans:"Duration of interviews"
+ },
+ {
+  n:19,
+  stm:"Disclosing that the analysis was guided by \"Grol & Wensing's Implementation of Change Model\" addresses which COREQ item?",
+  opts:["Theoretical framework underpinning analysis","Non-participation","Mode of interview","Transcription","Participant quotations"],
+  ans:"Theoretical framework underpinning analysis"
+ },
+ {
+  n:20,
+  stm:"\"A subset of translations was independently verified by two bilingual co-authors\" — although COREQ has no item named 'translation', this practice is BEST classified as a strategy supporting:",
+  opts:["Trustworthiness / rigour of data handling (transcription accuracy)","Sampling adequacy","Ethical approval","Participant remuneration","Statistical power"],
+  ans:"Trustworthiness / rigour of data handling (transcription accuracy)"
+ }
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let answers = {};        // qNum -> chosen value
+let endTime = null;
+let tick = null;
+let candidate = {name:"",id:"",start:"",end:""};
+
+/* ============================================================
+   GATE LOGIC
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+function checkWindowOpen(){
+  const now = new Date();
+  if(now < CONFIG.openFrom)  return {ok:false,msg:"This exam is not yet available. It opens on 18 May 2026."};
+  if(now > CONFIG.openUntil) return {ok:false,msg:"The examination window has closed. Access was valid 18–20 May 2026."};
+  return {ok:true};
+}
+
+function priorAttempt(){
+  try{ return JSON.parse(localStorage.getItem(CONFIG.storageKey)); }
+  catch(e){ return null; }
+}
+
+window.addEventListener("DOMContentLoaded",()=>{
+  // check expiry window
+  const w = checkWindowOpen();
+  if(!w.ok){
+    showBlock("&#9203;","Examination Unavailable",w.msg);
+    return;
+  }
+  // check prior attempt
+  const prev = priorAttempt();
+  if(prev && prev.submitted){
+    showBlock("&#128274;","Exam Already Completed",
+      "Our records show this exam was already submitted on this device by "+
+      (prev.name||"a candidate")+" (ID: "+(prev.id||"—")+"). Only one attempt is permitted.");
+    return;
+  }
+  // if an attempt is in progress (page refreshed) resume timer
+  if(prev && prev.inProgress && prev.endTime){
+    candidate = prev.candidate || candidate;
+    resumeExam(prev);
+  }
+});
+
+$("startBtn").addEventListener("click",startExam);
+$("spass").addEventListener("keydown",e=>{ if(e.key==="Enter") startExam(); });
+
+function startExam(){
+  const name = $("sname").value.trim();
+  const id   = $("sid").value.trim();
+  const pass = $("spass").value;
+  const err  = $("gateErr");
+  err.textContent="";
+
+  if(!name){ err.textContent="Please enter your full name."; return; }
+  if(!id){   err.textContent="Please enter your student ID."; return; }
+  if(pass!==CONFIG.password){ err.textContent="Incorrect access password. Please check and try again."; return; }
+
+  const w = checkWindowOpen();
+  if(!w.ok){ err.textContent=w.msg; return; }
+  if(priorAttempt() && priorAttempt().submitted){
+    err.textContent="This exam has already been completed on this device.";
+    return;
+  }
+
+  candidate.name=name; candidate.id=id;
+  candidate.start=new Date().toISOString();
+  endTime = Date.now() + CONFIG.durationMin*60*1000;
+
+  // persist in-progress state so refresh cannot reset the timer
+  saveProgress({inProgress:true, submitted:false, name:name, id:id,
+    endTime:endTime, candidate:candidate});
+
+  launchExamUI();
+}
+
+function resumeExam(prev){
+  endTime = prev.endTime;
+  if(Date.now() >= endTime){
+    // time already elapsed during the closed period -> auto submit empty
+    launchExamUI();
+    finishExam(true);
+    return;
+  }
+  launchExamUI();
+}
+
+/* ============================================================
+   BUILD EXAM UI
+   ============================================================ */
+function launchExamUI(){
+  $("gate").classList.add("hidden");
+  $("exam").classList.remove("hidden");
+  $("chipName").textContent = "Candidate: "+candidate.name;
+  $("chipId").textContent   = "ID: "+candidate.id;
+  renderMCQ();
+  renderDD();
+  startClock();
+  // disable text selection of nothing special — open book, so selection allowed
+  window.addEventListener("beforeunload",function(e){
+    const p=priorAttempt();
+    if(p && p.inProgress && !p.submitted){ e.preventDefault(); e.returnValue=""; }
+  });
+}
+
+function renderMCQ(){
+  const c=$("mcqContainer");
+  const letters=["A","B","C","D","E"];
+  MCQ.forEach(q=>{
+    const div=document.createElement("div");
+    div.className="q";
+    let html='<span class="qnum">Question '+q.n+'</span>'+
+             '<div class="stem">'+q.stem+'</div>';
+    q.opts.forEach((o,i)=>{
+      const L=letters[i];
+      html+='<label class="opt" data-q="'+q.n+'" data-v="'+L+'">'+
+            '<input type="radio" name="q'+q.n+'" value="'+L+'">'+
+            '<span class="lbl">'+L+'.</span><span class="txt">'+o+'</span></label>';
+    });
+    div.innerHTML=html;
+    c.appendChild(div);
+  });
+  c.querySelectorAll(".opt").forEach(opt=>{
+    opt.addEventListener("click",()=>{
+      const qn=opt.dataset.q;
+      c.querySelectorAll('.opt[data-q="'+qn+'"]').forEach(o=>o.classList.remove("sel"));
+      opt.classList.add("sel");
+      opt.querySelector("input").checked=true;
+      answers[qn]=opt.dataset.v;
+      updateProgress();
+    });
+  });
+}
+
+function renderDD(){
+  const c=$("ddContainer");
+  DD.forEach(q=>{
+    const div=document.createElement("div");
+    div.className="q";
+    let html='<span class="qnum">Question '+q.n+'</span>'+
+             '<div class="dd-row"><span class="stm">'+q.stm+'</span>'+
+             '<select data-q="'+q.n+'"><option value="">— Select your answer —</option>';
+    // shuffle options deterministically by question number for fairness
+    const shuffled = shuffle(q.opts.slice(), q.n);
+    shuffled.forEach(o=>{ html+='<option value="'+o.replace(/"/g,'&quot;')+'">'+o+'</option>'; });
+    html+='</select></div>';
+    div.innerHTML=html;
+    c.appendChild(div);
+  });
+  c.querySelectorAll("select").forEach(sel=>{
+    sel.addEventListener("change",()=>{
+      const qn=sel.dataset.q;
+      if(sel.value){ answers[qn]=sel.value; sel.classList.add("done"); }
+      else{ delete answers[qn]; sel.classList.remove("done"); }
+      updateProgress();
+    });
+  });
+}
+
+/* deterministic shuffle so each question's options are stable but mixed */
+function shuffle(arr,seed){
+  let s=seed*9301+49297;
+  for(let i=arr.length-1;i>0;i--){
+    s=(s*9301+49297)%233280;
+    const j=Math.floor((s/233280)*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+function updateProgress(){
+  const n=Object.keys(answers).length;
+  $("progPill").textContent=n+" / 20 answered";
+  $("answeredCount").textContent=n;
+}
+
+/* ============================================================
+   TIMER
+   ============================================================ */
+function startClock(){
+  tick=setInterval(()=>{
+    const left=endTime-Date.now();
+    if(left<=0){
+      clearInterval(tick);
+      renderClock(0);
+      finishExam(true);   // auto-submit
+      return;
+    }
+    renderClock(left);
+  },1000);
+  renderClock(endTime-Date.now());
+}
+
+function renderClock(ms){
+  const total=Math.max(0,Math.floor(ms/1000));
+  const m=String(Math.floor(total/60)).padStart(2,"0");
+  const s=String(total%60).padStart(2,"0");
+  const txt=m+":"+s;
+  const clk=$("clock");
+  clk.textContent=txt;
+  $("barTime").textContent=txt;
+  clk.classList.remove("warn","danger");
+  if(total<=60) clk.classList.add("danger");
+  else if(total<=300) clk.classList.add("warn");
+}
+
+/* ============================================================
+   SUBMISSION
+   ============================================================ */
+$("submitBtn").addEventListener("click",()=>{
+  const n=Object.keys(answers).length;
+  let msg="Submit your exam now?";
+  if(n<20) msg="You have answered "+n+" of 20 questions. Unanswered questions score 0.\n\nSubmit anyway? This cannot be undone.";
+  if(confirm(msg)) finishExam(false);
+});
+
+function finishExam(auto){
+  if(tick) clearInterval(tick);
+  candidate.end=new Date().toISOString();
+
+  // grade
+  let mcqScore=0, ddScore=0;
+  const detail=[];
+  MCQ.forEach(q=>{
+    const got=answers[q.n]||"";
+    const ok=(got===q.ans);
+    if(ok) mcqScore++;
+    detail.push({q:q.n,part:"A",chosen:got||"(blank)",correct:q.ans,ok:ok});
+  });
+  DD.forEach(q=>{
+    const got=answers[q.n]||"";
+    const ok=(got===q.ans);
+    if(ok) ddScore++;
+    detail.push({q:q.n,part:"B",chosen:got||"(blank)",correct:q.ans,ok:ok});
+  });
+  const total=mcqScore+ddScore;
+
+  // persist as submitted (locks future attempts)
+  saveProgress({inProgress:false, submitted:true,
+    name:candidate.name, id:candidate.id, candidate:candidate,
+    score:total, mcq:mcqScore, dd:ddScore, detail:detail,
+    submittedAt:candidate.end});
+
+  // show result overlay
+  $("exam").classList.add("hidden");
+  $("resultOverlay").classList.remove("hidden");
+  $("resTitle").textContent = auto ? "Time Up — Exam Auto-Submitted" : "Exam Submitted Successfully";
+  $("resMsg").textContent   = auto
+     ? "The 60-minute limit was reached. Your answers were submitted automatically and the exam is now locked."
+     : "Your responses have been recorded. This exam is now locked and cannot be reopened.";
+  $("scoreBox").textContent = total+" / 20";
+  $("resDetail").textContent="Part A (MCQ): "+mcqScore+" / 10  ·  Part B (COREQ): "+ddScore+" / 10";
+
+  // build downloadable receipt
+  $("downloadBtn").onclick=()=>downloadReceipt(total,mcqScore,ddScore,detail);
+}
+
+function downloadReceipt(total,mcq,dd,detail){
+  let txt="";
+  txt+="UNIVERSITY OF JORDAN — SCHOOL OF PHARMACY\n";
+  txt+="M.Pharm (Pharmacy Administration)\n";
+  txt+="Qualitative Research Methodology — Open-Book Examination\n";
+  txt+="================================================\n\n";
+  txt+="Candidate Name : "+candidate.name+"\n";
+  txt+="Student ID     : "+candidate.id+"\n";
+  txt+="Started        : "+candidate.start+"\n";
+  txt+="Submitted      : "+candidate.end+"\n\n";
+  txt+="RESULT\n";
+  txt+="  Part A (MCQ, A–E)        : "+mcq+" / 10\n";
+  txt+="  Part B (COREQ drop-down) : "+dd+" / 10\n";
+  txt+="  TOTAL                    : "+total+" / 20\n\n";
+  txt+="ANSWER LOG\n";
+  txt+="Q   Part  Your Answer                Correct                    Result\n";
+  txt+="------------------------------------------------------------------------\n";
+  detail.forEach(d=>{
+    txt+=String(d.q).padEnd(4)+d.part.padEnd(6)+
+         String(d.chosen).substring(0,26).padEnd(28)+
+         String(d.correct).substring(0,26).padEnd(28)+
+         (d.ok?"CORRECT":"incorrect")+"\n";
+  });
+  txt+="\nThis receipt is auto-generated. Submit it to your instructor if requested.\n";
+
+  const blob=new Blob([txt],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="ExamSubmission_"+candidate.id+"_"+candidate.name.replace(/\s+/g,"")+".txt";
+  a.click();
+}
+
+/* ============================================================
+   STORAGE & BLOCK HELPERS
+   ============================================================ */
+function saveProgress(obj){
+  try{ localStorage.setItem(CONFIG.storageKey,JSON.stringify(obj)); }
+  catch(e){ /* storage unavailable — exam still runs, but lock not persisted */ }
+}
+
+function showBlock(icon,title,msg){
+  $("gate").classList.add("hidden");
+  $("exam").classList.add("hidden");
+  $("blockIcon").innerHTML=icon;
+  $("blockTitle").textContent=title;
+  $("blockMsg").textContent=msg;
+  $("blockOverlay").classList.remove("hidden");
+}
+</script>
+</body>
+</html>
