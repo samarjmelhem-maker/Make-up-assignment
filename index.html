@@ -206,6 +206,7 @@
     <p id="resMsg">Your responses have been recorded. This exam is now locked.</p>
     <div class="scorebox" id="scoreBox">—</div>
     <p id="resDetail" style="font-size:.85rem;"></p>
+    <p id="uploadStatus" style="font-size:.85rem;font-weight:700;margin-bottom:14px;min-height:20px;"></p>
     <button class="btn" id="downloadBtn">Download My Submission Receipt</button>
   </div>
 </div>
@@ -225,10 +226,14 @@
    ============================================================ */
 const CONFIG = {
   password   : "MelhemQ2024",
-  durationMin: 40,
-  openFrom   : new Date(2026,4,18,0,0,0),   // 18 May 2026 00:00 (month is 0-indexed)
-  openUntil  : new Date(2026,4,20,23,59,59),// 20 May 2026 23:59
-  storageKey : "qualResearchExam_MPharm_2026"
+  durationMin: 2,   // TEST MODE: 2-minute timer
+  openFrom   : new Date(2000,0,1,0,0,0),    // TEST MODE: always open
+  openUntil  : new Date(2099,0,1,0,0,0),    // TEST MODE: always open
+  storageKey : "qualResearchExam_MPharm_2026",
+  // ===== GRADEBOOK BACKEND =====
+  // Paste the Google Apps Script Web App URL between the quotes below.
+  // Leave it empty ("") to run the exam without a backend (offline only).
+  backendUrl : ""
 };
 
 /* ============================================================
@@ -426,6 +431,8 @@ const DD = [
 let answers = {};        // qNum -> chosen value
 let endTime = null;
 let tick = null;
+let hardTimeout = null;  // backup deadline timer (survives interval throttling)
+let examFinished = false;// guard: ensures the exam closes/submits only once
 let candidate = {name:"",id:"",start:"",end:""};
 
 /* ============================================================
@@ -490,7 +497,10 @@ function startExam(){
 
   candidate.name=name; candidate.id=id;
   candidate.start=new Date().toISOString();
-  endTime = Date.now() + CONFIG.durationMin*60*1000;
+  // 40 minutes from now, but never past the exam window's closing time.
+  // A student who starts late gets only the time remaining in the window.
+  const fortyMin = Date.now() + CONFIG.durationMin*60*1000;
+  endTime = Math.min(fortyMin, CONFIG.openUntil.getTime());
 
   // persist in-progress state so refresh cannot reset the timer
   saveProgress({inProgress:true, submitted:false, name:name, id:id,
@@ -603,17 +613,41 @@ function updateProgress(){
    TIMER
    ============================================================ */
 function startClock(){
+  // Primary ticker — updates the visible clock every second.
   tick=setInterval(()=>{
     const left=endTime-Date.now();
     if(left<=0){
-      clearInterval(tick);
-      renderClock(0);
-      finishExam(true);   // auto-submit
+      forceTimeUp();
       return;
     }
     renderClock(left);
   },1000);
   renderClock(endTime-Date.now());
+
+  // Backup 1 — a single hard timeout aimed exactly at the deadline.
+  // setTimeout survives even if the 1-second interval is throttled.
+  const msLeft=endTime-Date.now();
+  hardTimeout=setTimeout(forceTimeUp, Math.max(0,msLeft)+200);
+
+  // Backup 2 — whenever the tab regains focus or visibility, re-check the
+  // clock immediately. Browsers freeze background timers, so a student who
+  // backgrounds the tab cannot gain extra time: the moment they return,
+  // if the 40 minutes has elapsed the exam closes at once.
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden && Date.now()>=endTime) forceTimeUp();
+  });
+  window.addEventListener("focus",()=>{
+    if(Date.now()>=endTime) forceTimeUp();
+  });
+}
+
+/* Single, idempotent "time is up" trigger. Safe to call many times. */
+function forceTimeUp(){
+  if(examFinished) return;
+  if(tick){ clearInterval(tick); tick=null; }
+  if(hardTimeout){ clearTimeout(hardTimeout); hardTimeout=null; }
+  renderClock(0);
+  finishExam(true);   // auto-submit, grade, and lock
 }
 
 function renderClock(ms){
@@ -640,7 +674,10 @@ $("submitBtn").addEventListener("click",()=>{
 });
 
 function finishExam(auto){
-  if(tick) clearInterval(tick);
+  if(examFinished) return;   // never submit/close twice
+  examFinished=true;
+  if(tick){ clearInterval(tick); tick=null; }
+  if(hardTimeout){ clearTimeout(hardTimeout); hardTimeout=null; }
   candidate.end=new Date().toISOString();
 
   // grade
@@ -678,6 +715,66 @@ function finishExam(auto){
 
   // build downloadable receipt
   $("downloadBtn").onclick=()=>downloadReceipt(total,mcqScore,ddScore,detail);
+
+  // send the grade to the online gradebook backend
+  sendToGradebook(total,mcqScore,ddScore,detail,auto);
+}
+
+/* ============================================================
+   SEND GRADE TO GOOGLE APPS SCRIPT GRADEBOOK
+   ============================================================ */
+function sendToGradebook(total,mcq,dd,detail,auto){
+  const status=$("uploadStatus");
+  if(!CONFIG.backendUrl){
+    // no backend configured — receipt download is the only record
+    if(status){
+      status.textContent="Offline mode: please download your receipt and submit it to your instructor.";
+      status.style.color="#7A5A00";
+    }
+    return;
+  }
+  if(status){ status.textContent="Uploading your submission to the gradebook…"; status.style.color="#5A6B8C"; }
+
+  // compact answer log string for the sheet
+  let log="";
+  detail.forEach(d=>{ log+="Q"+d.q+":"+d.chosen+(d.ok?"(✓)":"(✗)")+"; "; });
+
+  const payload={
+    studentName : candidate.name,
+    studentId   : candidate.id,
+    total       : total,
+    mcq         : mcq,
+    dd          : dd,
+    startedAt   : candidate.start,
+    submittedAt : candidate.end,
+    autoSubmitted: !!auto,
+    answerLog   : log
+  };
+
+  // mode:'no-cors' + text/plain — matches the Apps Script deployment pattern.
+  // The browser will not read the reply, so a completed fetch = success.
+  fetch(CONFIG.backendUrl,{
+    method:"POST",
+    mode:"no-cors",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(payload)
+  })
+  .then(()=>{
+    if(status){
+      status.textContent="✓ Your submission has been recorded in the gradebook.";
+      status.style.color="#06966E";
+    }
+    // mark in localStorage that the upload completed
+    const p=priorAttempt()||{};
+    p.uploaded=true; saveProgress(p);
+  })
+  .catch(()=>{
+    if(status){
+      status.textContent="⚠ Could not reach the gradebook (no internet?). "
+        +"Please download your receipt below and email it to your instructor.";
+      status.style.color="#C0392B";
+    }
+  });
 }
 
 function downloadReceipt(total,mcq,dd,detail){
@@ -729,5 +826,15 @@ function showBlock(icon,title,msg){
   $("blockOverlay").classList.remove("hidden");
 }
 </script>
+  <button type="button" id="resetTest" style="position:fixed;bottom:14px;right:14px;
+    background:#FF6B6B;color:#fff;border:none;border-radius:8px;padding:10px 16px;
+    font-weight:800;font-family:inherit;cursor:pointer;z-index:999;">&#9851; Reset Test Attempt</button>
+  <script>
+   document.getElementById('resetTest').addEventListener('click',function(){
+     localStorage.removeItem('qualResearchExam_MPharm_2026');
+     alert('Test attempt cleared. Reload the page to start fresh.');
+     location.reload();
+   });
+  </script>
 </body>
 </html>
