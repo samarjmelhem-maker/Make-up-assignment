@@ -986,13 +986,19 @@ function startExam(){
 
 function resumeExam(prev){
   endTime = prev.endTime;
+  // restore any answers saved before the refresh/crash
+  if(prev.answers && typeof prev.answers==="object"){
+    answers = prev.answers;
+  }
   if(Date.now() >= endTime){
-    // time already elapsed during the closed period -> auto submit empty
+    // the 40 minutes already elapsed (e.g. tab left open past the deadline)
+    // -> launch, then immediately auto-submit WITH the restored answers.
     launchExamUI();
     finishExam(true);
     return;
   }
   launchExamUI();
+  updateProgress();   // reflect restored answers in the counters
 }
 
 /* ============================================================
@@ -1044,8 +1050,28 @@ function renderMCQ(){
       opt.querySelector("input").checked=true;
       answers[qn]=opt.dataset.v;
       updateProgress();
+      persistAnswers();   // save immediately so a refresh/crash keeps the answer
     });
   });
+  // restore any previously-saved selections (after a refresh/resume)
+  MCQ.forEach(q=>{
+    const v=answers[q.n];
+    if(v){
+      const opt=c.querySelector('.opt[data-q="'+q.n+'"][data-v="'+v+'"]');
+      if(opt){ opt.classList.add("sel"); opt.querySelector("input").checked=true; }
+    }
+  });
+}
+
+/* Save the in-progress answers into localStorage after every change, so a
+   refresh, crash, or auto-close always has the latest answers. */
+function persistAnswers(){
+  if(candidate.isInstructor) return;          // test runs are not persisted
+  const p=priorAttempt();
+  if(!p || !p.inProgress) return;             // only while an attempt is live
+  p.answers=answers;
+  p.candidate=candidate;
+  saveProgress(p);
 }
 
 function renderDD(){
@@ -1069,7 +1095,16 @@ function renderDD(){
       if(sel.value){ answers[qn]=sel.value; sel.classList.add("done"); }
       else{ delete answers[qn]; sel.classList.remove("done"); }
       updateProgress();
+      persistAnswers();   // save immediately so a refresh/crash keeps the answer
     });
+  });
+  // restore any previously-saved selections (after a refresh/resume)
+  DD.forEach(q=>{
+    const v=answers[q.n];
+    if(v){
+      const sel=c.querySelector('select[data-q="'+q.n+'"]');
+      if(sel){ sel.value=v; if(sel.value) sel.classList.add("done"); }
+    }
   });
 }
 
