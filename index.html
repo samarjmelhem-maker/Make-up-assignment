@@ -121,7 +121,7 @@
     <div class="notice">
       <b>Before you begin — please read:</b><br>
       • This is an <b>open-book</b> exam. You may consult the two assigned Melhem &amp; Melhem articles.<br>
-      • Once opened, you have <b>exactly 60 minutes</b>. The exam submits and locks automatically when time ends.<br>
+      • Once opened, you have <b>exactly 40 minutes</b>. The exam submits and locks automatically when time ends.<br>
       • <b>One attempt only.</b> The exam will not reopen on this device after submission.<br>
       • Valid only <b>18 May 2026 – 20 May 2026</b>. No internet connection is required.<br>
       • Do not refresh the page during the exam — your timer keeps running.
@@ -139,7 +139,7 @@
       <label for="spass">Access Password</label>
       <input type="password" id="spass" placeholder="Enter exam password" autocomplete="off">
     </div>
-    <button class="btn" id="startBtn">Start Exam — Begin 60-Minute Timer</button>
+    <button class="btn" id="startBtn">Start Exam — Begin 40-Minute Timer</button>
     <div class="err" id="gateErr"></div>
   </div>
 </div>
@@ -151,7 +151,7 @@
       <small>M.Pharm Administration · University of Jordan</small></div>
     <div class="timer">
       <span class="progress-pill" id="progPill">0 / 20 answered</span>
-      <div class="clock" id="clock">60:00</div>
+      <div class="clock" id="clock">40:00</div>
     </div>
   </header>
   <div class="accent"></div>
@@ -165,7 +165,7 @@
       <div class="meta-row">
         <span class="chip" id="chipName">Candidate: —</span>
         <span class="chip" id="chipId">ID: —</span>
-        <span class="chip">Duration: 60 minutes</span>
+        <span class="chip">Duration: 40 minutes</span>
         <span class="chip">Total: 20 marks</span>
       </div>
     </div>
@@ -193,7 +193,7 @@
 
   <div class="submitbar">
     <div class="stat">Answered: <b id="answeredCount">0</b> / 20 &nbsp;·&nbsp;
-      Time left: <b id="barTime">60:00</b></div>
+      Time left: <b id="barTime">40:00</b></div>
     <button class="btn teal" id="submitBtn">Submit Exam</button>
   </div>
 </div>
@@ -225,7 +225,7 @@
    ============================================================ */
 const CONFIG = {
   password   : "MelhemQ2024",
-  durationMin: 60,
+  durationMin: 40,
   openFrom   : new Date(2026,4,18,0,0,0),   // 18 May 2026 00:00 (month is 0-indexed)
   openUntil  : new Date(2026,4,20,23,59,59),// 20 May 2026 23:59
   storageKey : "qualResearchExam_MPharm_2026"
@@ -671,7 +671,7 @@ function finishExam(auto){
   $("resultOverlay").classList.remove("hidden");
   $("resTitle").textContent = auto ? "Time Up — Exam Auto-Submitted" : "Exam Submitted Successfully";
   $("resMsg").textContent   = auto
-     ? "The 60-minute limit was reached. Your answers were submitted automatically and the exam is now locked."
+     ? "The 40-minute limit was reached. Your answers were submitted automatically and the exam is now locked."
      : "Your responses have been recorded. This exam is now locked and cannot be reopened.";
   $("scoreBox").textContent = total+" / 20";
   $("resDetail").textContent="Part A (MCQ): "+mcqScore+" / 10  ·  Part B (COREQ): "+ddScore+" / 10";
