@@ -109,6 +109,10 @@
     padding:20px;border-top:1px solid var(--border);margin-top:30px;}
   @media print{.submitbar,header,.btn{display:none;}}
 </style>
+<!-- jsPDF: generates the tamper-resistant PDF receipt in the student's browser.
+     If this CDN is unreachable (fully offline), the exam falls back to a
+     text receipt automatically — the verification code works in both. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -134,6 +138,10 @@
     <div class="field">
       <label for="sid">University Student ID</label>
       <input type="text" id="sid" placeholder="Enter your student ID" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="semail">University Email</label>
+      <input type="email" id="semail" placeholder="e.g. TSN0000000@ju.edu.jo" autocomplete="off">
     </div>
     <div class="field">
       <label for="spass">Access Password</label>
@@ -165,6 +173,7 @@
       <div class="meta-row">
         <span class="chip" id="chipName">Candidate: —</span>
         <span class="chip" id="chipId">ID: —</span>
+        <span class="chip" id="chipEmail">Email: —</span>
         <span class="chip">Duration: 40 minutes</span>
         <span class="chip">Total: 20 marks</span>
       </div>
@@ -226,15 +235,58 @@
    ============================================================ */
 const CONFIG = {
   password   : "MelhemQ2024",
-  durationMin: 2,   // TEST MODE: 2-minute timer
-  openFrom   : new Date(2000,0,1,0,0,0),    // TEST MODE: always open
-  openUntil  : new Date(2099,0,1,0,0,0),    // TEST MODE: always open
+  durationMin: 40,
+  openFrom   : new Date(2026,4,18,0,0,0),   // 18 May 2026 00:00 (month is 0-indexed)
+  openUntil  : new Date(2026,4,20,23,59,59),// 20 May 2026 23:59
   storageKey : "qualResearchExam_MPharm_2026",
-  // ===== GRADEBOOK BACKEND =====
-  // Paste the Google Apps Script Web App URL between the quotes below.
-  // Leave it empty ("") to run the exam without a backend (offline only).
-  backendUrl : ""
+  // ===== INSTRUCTOR TEST ACCESS =====
+  // When this email is entered at login, the exam runs in instructor-test
+  // mode: the 18-20 May date window and the one-attempt lock are bypassed,
+  // so the instructor can trial the live exam repeatedly. Instructor-test
+  // submissions are flagged and are NOT written as a real student grade.
+  instructorEmail : "sa.melhem@ju.edu.jo"
+  // ===== TAMPER-RESISTANT RECEIPT =====
+  // The verification salt is NOT stored here as readable text. It is
+  // assembled at runtime by _vs() below from an obfuscated numeric array,
+  // so a student opening this file will not see the salt as a plain string.
+  // NOTE: obfuscation stops casual inspection only. A technically skilled
+  // student using browser developer tools can still recover it, because the
+  // browser must compute the code. For protection beyond that, code
+  // generation would have to move to a server.
 };
+
+/* ============================================================
+   VERIFICATION CODE  — must stay identical to the instructor verifier
+   ============================================================ */
+/* obfuscated salt: numeric deltas, reassembled at runtime (not readable text) */
+function _vs(){
+  var d=[33,44,4,36,39,63,56,73,68,4,40,76,56,67,41,60,74,4,9,7,9,13,4,77,34,14,79];
+  var b=41,s="";
+  for(var i=0;i<d.length;i++){ s+=String.fromCharCode(d[i]+b); }
+  return s;
+}
+function h32(str){
+  let h=0x811c9dc5;
+  for(let i=0;i<str.length;i++){
+    h^=str.charCodeAt(i);
+    h=(h+((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)))>>>0;
+  }
+  return h>>>0;
+}
+function makeVerifyCode(name,id,total,mcq,dd){
+  // Score-bound code: identity + total + section scores. This matches the
+  // instructor verifier, which does not have the per-question answers.
+  const salt=_vs();
+  const payload=[String(name).trim().toUpperCase(),
+                 String(id).trim().toUpperCase(),
+                 total,mcq,dd].join("|");
+  const base=salt+"|S|"+payload;
+  const a=h32(base).toString(36).toUpperCase().padStart(7,"0");
+  const b=h32(base.split("").reverse().join("")+salt)
+            .toString(36).toUpperCase().padStart(7,"0");
+  const raw=(a+b).replace(/[^A-Z0-9]/g,"").padEnd(12,"X").slice(0,12);
+  return raw.slice(0,4)+"-"+raw.slice(4,8)+"-"+raw.slice(8,12);
+}
 
 /* ============================================================
    QUESTION BANK  — Part A: 10 difficult MCQs (A–E)
@@ -433,7 +485,7 @@ let endTime = null;
 let tick = null;
 let hardTimeout = null;  // backup deadline timer (survives interval throttling)
 let examFinished = false;// guard: ensures the exam closes/submits only once
-let candidate = {name:"",id:"",start:"",end:""};
+let candidate = {name:"",id:"",email:"",start:"",end:"",isInstructor:false};
 
 /* ============================================================
    GATE LOGIC
@@ -476,35 +528,57 @@ window.addEventListener("DOMContentLoaded",()=>{
 
 $("startBtn").addEventListener("click",startExam);
 $("spass").addEventListener("keydown",e=>{ if(e.key==="Enter") startExam(); });
+$("semail").addEventListener("keydown",e=>{ if(e.key==="Enter") startExam(); });
 
 function startExam(){
-  const name = $("sname").value.trim();
-  const id   = $("sid").value.trim();
-  const pass = $("spass").value;
-  const err  = $("gateErr");
+  const name  = $("sname").value.trim();
+  const id    = $("sid").value.trim();
+  const email = $("semail").value.trim();
+  const pass  = $("spass").value;
+  const err   = $("gateErr");
   err.textContent="";
 
-  if(!name){ err.textContent="Please enter your full name."; return; }
-  if(!id){   err.textContent="Please enter your student ID."; return; }
-  if(pass!==CONFIG.password){ err.textContent="Incorrect access password. Please check and try again."; return; }
-
-  const w = checkWindowOpen();
-  if(!w.ok){ err.textContent=w.msg; return; }
-  if(priorAttempt() && priorAttempt().submitted){
-    err.textContent="This exam has already been completed on this device.";
-    return;
+  if(!name){  err.textContent="Please enter your full name."; return; }
+  if(!id){    err.textContent="Please enter your student ID."; return; }
+  if(!email){ err.textContent="Please enter your university email."; return; }
+  // basic email format check
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    err.textContent="Please enter a valid email address."; return;
+  }
+  if(pass!==CONFIG.password){
+    err.textContent="Incorrect access password. Please check and try again."; return;
   }
 
-  candidate.name=name; candidate.id=id;
-  candidate.start=new Date().toISOString();
-  // 40 minutes from now, but never past the exam window's closing time.
-  // A student who starts late gets only the time remaining in the window.
-  const fortyMin = Date.now() + CONFIG.durationMin*60*1000;
-  endTime = Math.min(fortyMin, CONFIG.openUntil.getTime());
+  // ----- Instructor-test mode -----
+  // If the instructor email is used, skip the date window and the
+  // one-attempt lock so the live exam can be trialled freely.
+  const isInstructor = (email.toLowerCase()===CONFIG.instructorEmail.toLowerCase());
 
-  // persist in-progress state so refresh cannot reset the timer
-  saveProgress({inProgress:true, submitted:false, name:name, id:id,
-    endTime:endTime, candidate:candidate});
+  if(!isInstructor){
+    const w = checkWindowOpen();
+    if(!w.ok){ err.textContent=w.msg; return; }
+    if(priorAttempt() && priorAttempt().submitted){
+      err.textContent="This exam has already been completed on this device.";
+      return;
+    }
+  }
+
+  candidate.name=name; candidate.id=id; candidate.email=email;
+  candidate.isInstructor=isInstructor;
+  candidate.start=new Date().toISOString();
+
+  // 40 minutes from now. For students it is also capped at the window
+  // close time; instructor-test mode is not capped.
+  const fortyMin = Date.now() + CONFIG.durationMin*60*1000;
+  endTime = isInstructor ? fortyMin
+                         : Math.min(fortyMin, CONFIG.openUntil.getTime());
+
+  // persist in-progress state so refresh cannot reset the timer.
+  // Instructor-test attempts are NOT persisted as a lock.
+  if(!isInstructor){
+    saveProgress({inProgress:true, submitted:false, name:name, id:id,
+      endTime:endTime, candidate:candidate});
+  }
 
   launchExamUI();
 }
@@ -528,6 +602,12 @@ function launchExamUI(){
   $("exam").classList.remove("hidden");
   $("chipName").textContent = "Candidate: "+candidate.name;
   $("chipId").textContent   = "ID: "+candidate.id;
+  $("chipEmail").textContent= "Email: "+candidate.email;
+  if(candidate.isInstructor){
+    const c=$("chipEmail");
+    c.textContent="INSTRUCTOR TEST MODE — not recorded";
+    c.style.background="#FFD166"; c.style.borderColor="#E0A800";
+  }
   renderMCQ();
   renderDD();
   startClock();
@@ -680,135 +760,195 @@ function finishExam(auto){
   if(hardTimeout){ clearTimeout(hardTimeout); hardTimeout=null; }
   candidate.end=new Date().toISOString();
 
-  // grade
+  // grade — answer values are trimmed of whitespace before comparison
+  // so a stray space can never cause a correct answer to be marked wrong.
   let mcqScore=0, ddScore=0;
   const detail=[];
   MCQ.forEach(q=>{
-    const got=answers[q.n]||"";
-    const ok=(got===q.ans);
+    const got=String(answers[q.n]||"").trim();
+    const key=String(q.ans).trim();
+    const ok=(got!=="" && got===key);
     if(ok) mcqScore++;
-    detail.push({q:q.n,part:"A",chosen:got||"(blank)",correct:q.ans,ok:ok});
+    detail.push({q:q.n,part:"A",chosen:got||"(blank)",correct:key,ok:ok});
   });
   DD.forEach(q=>{
-    const got=answers[q.n]||"";
-    const ok=(got===q.ans);
+    const got=String(answers[q.n]||"").trim();
+    const key=String(q.ans).trim();
+    const ok=(got!=="" && got===key);
     if(ok) ddScore++;
-    detail.push({q:q.n,part:"B",chosen:got||"(blank)",correct:q.ans,ok:ok});
+    detail.push({q:q.n,part:"B",chosen:got||"(blank)",correct:key,ok:ok});
   });
   const total=mcqScore+ddScore;
 
-  // persist as submitted (locks future attempts)
-  saveProgress({inProgress:false, submitted:true,
-    name:candidate.name, id:candidate.id, candidate:candidate,
-    score:total, mcq:mcqScore, dd:ddScore, detail:detail,
-    submittedAt:candidate.end});
+  // persist as submitted (locks future attempts).
+  // Instructor-test attempts are NOT locked, so the exam can be retaken.
+  if(!candidate.isInstructor){
+    saveProgress({inProgress:false, submitted:true,
+      name:candidate.name, id:candidate.id, candidate:candidate,
+      score:total, mcq:mcqScore, dd:ddScore, detail:detail,
+      submittedAt:candidate.end});
+  }
 
   // show result overlay
   $("exam").classList.add("hidden");
   $("resultOverlay").classList.remove("hidden");
-  $("resTitle").textContent = auto ? "Time Up — Exam Auto-Submitted" : "Exam Submitted Successfully";
-  $("resMsg").textContent   = auto
-     ? "The 40-minute limit was reached. Your answers were submitted automatically and the exam is now locked."
-     : "Your responses have been recorded. This exam is now locked and cannot be reopened.";
+  if(candidate.isInstructor){
+    $("resTitle").textContent = "Instructor Test — Run Complete";
+    $("resMsg").textContent   = "INSTRUCTOR-TEST MODE: this run was not locked and "
+      + "is not recorded as a student grade. Reload the page to test again.";
+  }else{
+    $("resTitle").textContent = auto ? "Time Up — Exam Auto-Submitted" : "Exam Submitted Successfully";
+    $("resMsg").textContent   = auto
+       ? "The 40-minute limit was reached. Your answers were submitted automatically and the exam is now locked."
+       : "Your responses have been recorded. This exam is now locked and cannot be reopened.";
+  }
   $("scoreBox").textContent = total+" / 20";
   $("resDetail").textContent="Part A (MCQ): "+mcqScore+" / 10  ·  Part B (COREQ): "+ddScore+" / 10";
 
-  // build downloadable receipt
-  $("downloadBtn").onclick=()=>downloadReceipt(total,mcqScore,ddScore,detail);
+  // ---- compute the tamper-resistant verification code ----
+  // Score-bound code: binds identity + score together. Editing the score on
+  // the receipt makes the code fail the instructor's verifier.
+  const vcode=makeVerifyCode(candidate.name,candidate.id,total,mcqScore,ddScore);
+  candidate.vcode=vcode;
 
-  // send the grade to the online gradebook backend
-  sendToGradebook(total,mcqScore,ddScore,detail,auto);
+  const us=$("uploadStatus");
+  if(us){
+    us.innerHTML="Verification code: <b style='letter-spacing:1px;'>"+vcode+"</b>"
+      +"<br><span style='font-weight:600;color:#5A6B8C;'>"
+      +"Download your receipt below and submit it to your instructor.</span>";
+    us.style.color="#0D2D6B";
+  }
+
+  // build downloadable receipt (PDF, with text fallback)
+  $("downloadBtn").onclick=()=>downloadReceipt(total,mcqScore,ddScore,vcode);
 }
 
 /* ============================================================
-   SEND GRADE TO GOOGLE APPS SCRIPT GRADEBOOK
+   TAMPER-RESISTANT RECEIPT
+   The answer log is intentionally NOT included — the receipt shows only
+   the candidate details, the score, and the verification code.
    ============================================================ */
-function sendToGradebook(total,mcq,dd,detail,auto){
-  const status=$("uploadStatus");
-  if(!CONFIG.backendUrl){
-    // no backend configured — receipt download is the only record
-    if(status){
-      status.textContent="Offline mode: please download your receipt and submit it to your instructor.";
-      status.style.color="#7A5A00";
-    }
-    return;
+function downloadReceipt(total,mcq,dd,vcode){
+  if(window.jspdf && window.jspdf.jsPDF){
+    try{ buildPdfReceipt(total,mcq,dd,vcode); return; }
+    catch(e){ /* fall through to text */ }
   }
-  if(status){ status.textContent="Uploading your submission to the gradebook…"; status.style.color="#5A6B8C"; }
-
-  // compact answer log string for the sheet
-  let log="";
-  detail.forEach(d=>{ log+="Q"+d.q+":"+d.chosen+(d.ok?"(✓)":"(✗)")+"; "; });
-
-  const payload={
-    studentName : candidate.name,
-    studentId   : candidate.id,
-    total       : total,
-    mcq         : mcq,
-    dd          : dd,
-    startedAt   : candidate.start,
-    submittedAt : candidate.end,
-    autoSubmitted: !!auto,
-    answerLog   : log
-  };
-
-  // mode:'no-cors' + text/plain — matches the Apps Script deployment pattern.
-  // The browser will not read the reply, so a completed fetch = success.
-  fetch(CONFIG.backendUrl,{
-    method:"POST",
-    mode:"no-cors",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify(payload)
-  })
-  .then(()=>{
-    if(status){
-      status.textContent="✓ Your submission has been recorded in the gradebook.";
-      status.style.color="#06966E";
-    }
-    // mark in localStorage that the upload completed
-    const p=priorAttempt()||{};
-    p.uploaded=true; saveProgress(p);
-  })
-  .catch(()=>{
-    if(status){
-      status.textContent="⚠ Could not reach the gradebook (no internet?). "
-        +"Please download your receipt below and email it to your instructor.";
-      status.style.color="#C0392B";
-    }
-  });
+  buildTextReceipt(total,mcq,dd,vcode);
 }
 
-function downloadReceipt(total,mcq,dd,detail){
+function fmtDate(iso){
+  try{ const d=new Date(iso);
+    return d.toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",
+      hour:"2-digit",minute:"2-digit"}); }
+  catch(e){ return iso; }
+}
+
+function buildPdfReceipt(total,mcq,dd,vcode){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:"pt",format:"a4"});
+  const W=doc.internal.pageSize.getWidth();
+
+  // header band
+  doc.setFillColor(13,45,107); doc.rect(0,0,W,82,"F");
+  doc.setFillColor(10,126,140); doc.rect(0,82,W,5,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFont("helvetica","bold"); doc.setFontSize(15);
+  doc.text("University of Jordan — School of Pharmacy",40,38);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  doc.text("M.Pharm (Pharmacy Administration)  ·  Examination Submission Receipt",40,58);
+
+  let y=120;
+  doc.setTextColor(13,45,107);
+  doc.setFont("helvetica","bold"); doc.setFontSize(12);
+  doc.text("Qualitative Research Methodology — Open-Book Examination",40,y);
+  y+=10;
+  doc.setDrawColor(208,218,240); doc.line(40,y,W-40,y); y+=26;
+
+  // candidate block
+  doc.setTextColor(27,35,51); doc.setFontSize(10.5);
+  function row(label,val){
+    doc.setFont("helvetica","bold"); doc.text(label,40,y);
+    doc.setFont("helvetica","normal"); doc.text(String(val),200,y);
+    y+=20;
+  }
+  row("Candidate Name:",candidate.name);
+  row("Student ID:",candidate.id);
+  row("University Email:",candidate.email);
+  row("Started:",fmtDate(candidate.start));
+  row("Submitted:",fmtDate(candidate.end));
+  if(candidate.isInstructor){
+    doc.setTextColor(192,57,43); doc.setFont("helvetica","bold");
+    doc.text("INSTRUCTOR-TEST RUN — not a recorded student grade",40,y); y+=20;
+    doc.setTextColor(27,35,51);
+  }
+  y+=10;
+
+  // result box
+  doc.setFillColor(231,246,248); doc.setDrawColor(10,126,140);
+  doc.roundedRect(40,y,W-80,78,6,6,"FD");
+  doc.setTextColor(10,126,140); doc.setFont("helvetica","bold"); doc.setFontSize(11);
+  doc.text("RESULT",54,y+24);
+  doc.setTextColor(27,35,51); doc.setFontSize(10.5); doc.setFont("helvetica","normal");
+  doc.text("Part A (MCQ, A-E):  "+mcq+" / 10",54,y+45);
+  doc.text("Part B (COREQ):  "+dd+" / 10",280,y+45);
+  doc.setFont("helvetica","bold"); doc.setFontSize(13);
+  doc.text("TOTAL:  "+total+" / 20   ("+Math.round(total/20*100)+"%)",54,y+66);
+  y+=104;
+
+  // verification code box — the anti-tamper element
+  doc.setFillColor(13,45,107);
+  doc.roundedRect(40,y,W-80,66,6,6,"F");
+  doc.setTextColor(255,209,102); doc.setFont("helvetica","bold"); doc.setFontSize(9);
+  doc.text("VERIFICATION CODE",54,y+22);
+  doc.setTextColor(255,255,255); doc.setFontSize(18);
+  doc.text(vcode,54,y+48);
+  doc.setTextColor(174,193,232); doc.setFont("helvetica","normal"); doc.setFontSize(7.5);
+  doc.text("This code is derived from the score. Any change to this receipt",
+           270,y+30,{maxWidth:W-320});
+  doc.text("invalidates it. The instructor verifies the code on submission.",
+           270,y+42,{maxWidth:W-320});
+  y+=92;
+
+  // footer
+  doc.setDrawColor(208,218,240); doc.line(40,y,W-40,y); y+=16;
+  doc.setFontSize(8); doc.setTextColor(90,107,140);
+  doc.text("Auto-generated receipt — Dr. Samar Melhem · University of Jordan",40,y);
+  doc.text("sa.melhem@ju.edu.jo · Office 225",40,y+12);
+
+  doc.save("ExamReceipt_"+candidate.id+"_"+candidate.name.replace(/\s+/g,"")+".pdf");
+}
+
+/* text fallback — only used if jsPDF did not load (fully offline) */
+function buildTextReceipt(total,mcq,dd,vcode){
   let txt="";
   txt+="UNIVERSITY OF JORDAN — SCHOOL OF PHARMACY\n";
   txt+="M.Pharm (Pharmacy Administration)\n";
   txt+="Qualitative Research Methodology — Open-Book Examination\n";
+  txt+="Examination Submission Receipt\n";
   txt+="================================================\n\n";
-  txt+="Candidate Name : "+candidate.name+"\n";
-  txt+="Student ID     : "+candidate.id+"\n";
-  txt+="Started        : "+candidate.start+"\n";
-  txt+="Submitted      : "+candidate.end+"\n\n";
-  txt+="RESULT\n";
-  txt+="  Part A (MCQ, A–E)        : "+mcq+" / 10\n";
+  txt+="Candidate Name  : "+candidate.name+"\n";
+  txt+="Student ID      : "+candidate.id+"\n";
+  txt+="University Email: "+candidate.email+"\n";
+  txt+="Started         : "+candidate.start+"\n";
+  txt+="Submitted       : "+candidate.end+"\n";
+  if(candidate.isInstructor){
+    txt+="** INSTRUCTOR-TEST RUN — NOT A RECORDED STUDENT GRADE **\n";
+  }
+  txt+="\nRESULT\n";
+  txt+="  Part A (MCQ, A-E)        : "+mcq+" / 10\n";
   txt+="  Part B (COREQ drop-down) : "+dd+" / 10\n";
-  txt+="  TOTAL                    : "+total+" / 20\n\n";
-  txt+="ANSWER LOG\n";
-  txt+="Q   Part  Your Answer                Correct                    Result\n";
-  txt+="------------------------------------------------------------------------\n";
-  detail.forEach(d=>{
-    txt+=String(d.q).padEnd(4)+d.part.padEnd(6)+
-         String(d.chosen).substring(0,26).padEnd(28)+
-         String(d.correct).substring(0,26).padEnd(28)+
-         (d.ok?"CORRECT":"incorrect")+"\n";
-  });
-  txt+="\nThis receipt is auto-generated. Submit it to your instructor if requested.\n";
+  txt+="  TOTAL                    : "+total+" / 20  ("+Math.round(total/20*100)+"%)\n\n";
+  txt+="VERIFICATION CODE : "+vcode+"\n";
+  txt+="(Derived from the score. Any change to this receipt invalidates the\n";
+  txt+=" code. The instructor verifies the code when the receipt is submitted.)\n\n";
+  txt+="Auto-generated receipt — submit it to your instructor.\n";
 
   const blob=new Blob([txt],{type:"text/plain"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="ExamSubmission_"+candidate.id+"_"+candidate.name.replace(/\s+/g,"")+".txt";
+  a.download="ExamReceipt_"+candidate.id+"_"+candidate.name.replace(/\s+/g,"")+".txt";
   a.click();
 }
-
 /* ============================================================
    STORAGE & BLOCK HELPERS
    ============================================================ */
@@ -826,15 +966,5 @@ function showBlock(icon,title,msg){
   $("blockOverlay").classList.remove("hidden");
 }
 </script>
-  <button type="button" id="resetTest" style="position:fixed;bottom:14px;right:14px;
-    background:#FF6B6B;color:#fff;border:none;border-radius:8px;padding:10px 16px;
-    font-weight:800;font-family:inherit;cursor:pointer;z-index:999;">&#9851; Reset Test Attempt</button>
-  <script>
-   document.getElementById('resetTest').addEventListener('click',function(){
-     localStorage.removeItem('qualResearchExam_MPharm_2026');
-     alert('Test attempt cleared. Reload the page to start fresh.');
-     location.reload();
-   });
-  </script>
 </body>
 </html>
